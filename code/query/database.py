@@ -3,9 +3,10 @@ Database management for proximity querying
 '''
 import geopandas as gpd
 import pandas as pd
-
+import time
 import os
 import sqlite3
+import csv
 import logging
 logger = logging.getLogger(__name__)
 
@@ -16,14 +17,14 @@ def Init(db_fn, orig_fn, dest_fn, db_temp_fn):
     '''
 
     #Load shapefiles
-    logger.info('Writing new combined-data.db')
+    logger.info('Writing new {}'.format(db_fn))
     orig_df = ReadShapefile('orig', orig_fn)
     dest_df = ReadShapefile('dest', dest_fn)
 
     #Clean up from before
     if os.path.isfile(db_temp_fn):
         os.remove(db_temp_fn)
-        logger.info('Deleting old temp-data.db')
+        logger.info('Deleting old {}'.format(db_temp_fn))
 
     #Initialize connections to .db's
     db = sqlite3.connect(db_temp_fn)
@@ -76,7 +77,7 @@ def Init(db_fn, orig_fn, dest_fn, db_temp_fn):
     #Close connections to .db's
     db.close()
     db1.close()
-    logger.info('Finished generating temp-data.db and combined-data.db')
+    logger.info('Finished generating {} and {}'.format(db_fn,db_temp_fn))
 
 
 def Write(mode, temp_fn, db_fn):

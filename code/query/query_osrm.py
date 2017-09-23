@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # suppress server request calls, so progress is obvious
 logging.getLogger("requests").setLevel(logging.WARNING)
 
-handler = logging.FileHandler('osrm_query_2km.log')
+handler = logging.FileHandler('osrm_query_2kmb.log')
 handler.setLevel(logging.INFO)
 
 # create a logging format
@@ -46,7 +46,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-def main(limit=5000, mode='walking', port=5000):
+def main(limit=2000, mode='walking', port=5000):
     '''
     Input:
         - Two shapefiles with coordinates and generates transit times between each pair.
@@ -56,9 +56,9 @@ def main(limit=5000, mode='walking', port=5000):
     # shapefiles
     orig_fn = '../data/block_data/sea_blocks_wgs84.shp' 
     dest_fn = '../data/block_data/sea_blocks_wgs84.shp' 
-    db_fn = '../query_results/combined-data_5km.db'
-    temp_fn = '../query_results/temp-data_5km.csv'
-    db_temp_fn = '../query_results/temp-data_5km.db'
+    db_fn = '../query_results/combined-data_2kmb.db'
+    temp_fn = '../query_results/temp-data_2kmb.csv'
+    db_temp_fn = '../query_results/temp-data_2kmb.db'
 
     # logger
     logger.info("Started with limit {} meters and mode {} on port {}".format(limit, mode, port))
@@ -75,7 +75,7 @@ def main(limit=5000, mode='walking', port=5000):
     BATCH_SIZE = 500
     cursor.execute('''SELECT COUNT(*) FROM origxdest'''.format(float(limit))) 
     data_len = cursor.fetchone()[0] / BATCH_SIZE
-    logger.info('Queries to execute: {}'.format(data_len))0]
+    logger.info('Queries to execute: {}'.format(data_len))
 
     #Query .db
     cursor.execute('''SELECT origxdest.orig_id, origxdest.dest_id, orig_lon, orig_lat, 

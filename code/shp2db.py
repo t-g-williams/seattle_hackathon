@@ -18,7 +18,7 @@ def main():
     # specify the filename
     shp_fn = '../data/seattle_contracts/seattle-contracts-geocoded.shp'
     block_fn = '../data/block_data/sea_blocks_wgs84.shp'
-    db_fn = '../query_results/sample_results_2.db'
+    db_fn = '../query_results/combined-data_5km.db'
 
     # specify the attributes to keep
     attributes = {

@@ -10,8 +10,8 @@ import sqlite3
 
 def main():
     # file names and parameters
+    db_fn =  '../query_results/combined-data_5km_contracts.db'
     db_fn =  '../query_results/sample_results_2.db'
-    db_fn =  'sample_results_2.db'
     max_dur = 30*60 # 30 minutes
 
     subsetDatabase(db_fn, max_dur)
@@ -19,14 +19,14 @@ def main():
 
 def subsetDatabase(db_fn, max_dur):
     # create connection to the database
-    db = sqlite3.connect(db_fn)
-    cursor = db.cursor()
+db = sqlite3.connect(db_fn)
+cursor = db.cursor()
 
     # create a dataframe with only the relevant O-D pairs
     createSubsetDataframe(cursor, max_dur)
 
     # calculate walk scores for origins
-    calcWalkScores(cursor)
+    calcWalkScores(cursor, max_dur)
 
     # # add origin lat and lon (for plotting)
     # od_pairs = addLatLon(od_pairs, cursor, 'orig')
@@ -39,79 +39,130 @@ def subsetDatabase(db_fn, max_dur):
     # od_pairs = addDemographicData(od_pairs, cursor, 'orig', dem_ids)
 
 
-def calcWalkScores(cursor):
+def calcWalkScores(cursor, max_dur):
     # calculate the walk score for each origin
 
     # get np.DataFrame of orig ids
     orig_ids = getTable(cursor, 'orig', [0], ['orig_id'])
-
+    scores_dict = {}
     # Loop through each origin id
     for i in range(len(orig_ids)):
+        if i % 100 == 0:
+            print('i = {} / {}'.format(i, len(orig_ids)))
         # find all services within 30min of this orig
-        # CHECK THIS!!! - NEED DATA
-        tmp = cursor.execute('''SELECT * FROM contracts 
-            WHERE dest_id IN 
-            (SELECT dest_id FROM destsubset WHERE orig_id={})'''
-            .format(orig_ids.ix[i]))
-        services_tuple = tmp.fetchall()
-        # convert to pandas data frame
-        services_list = [x for x in services_tuple]
-        services_pd = pd.DataFrame(services_list, columns=getColNames(cursor, 'contracts'))
-        # add column for duration
-        services_pd['walking_time'] = None
-
+        services_pd = getVendorsForOrig(orig_ids.ix[i][0], cursor)
         # loop through the services
-        for i in range(services_pd.shape[0]):
+        for j in range(services_pd.shape[0]):
             # get the duration to this service
             tmp = cursor.execute('''SELECT walking_time FROM destsubset 
-                WHERE dest_id={}'''.format(services_pd.ix[i, 'dest_id']))
+                WHERE dest_id={} AND orig_id={}'''
+                .format(services_pd.ix[j, 'dest_id'], orig_ids.ix[i][0]))
             duration = tmp.fetchall()
             # add to data frame
-            services_pd.ix[i, 'walking_time'] = duration
-
+            services_pd.ix[j, 'walking_time'] = duration [0][0]
         # CALCULATE WALKING SCORE
+        score = calcHSSAScore(services_pd, cursor, max_dur)
+        scores_dict[orig_ids.ix[i][0]] = score
+    # add scores to database
 
+
+
+def calcHSSAScore(services, cursor, max_dur):
+    # Calculate the HSSA score for a given origin
+    # Note: this code is adapted from Logan Noel's code
+    # https://github.com/GeoDaCenter/contracts/blob/master/analytics/ScoreModel.py
+    WEIGHTS = [.1, .25, .5, .75, 1]
+    weight_dict = {}
+    score = 0
+    for i in range(services.shape[0]):
+        # cat = VendorLookup(cursor, services.ix[i, 'ContractNo'], 'Project')
+        cat = services.ix[i, 'Project']
+        if cat not in weight_dict:
+            weight_dict[cat] = WEIGHTS
+        if len(weight_dict[cat]) > 0:
+            variety_weight = weight_dict[cat].pop()
+        else:
+            variety_weight = 0
+        distance_weight = linearDecayFunction(services.ix[i, 'walking_time'], max_dur)
+        # calculate score
+        score += variety_weight * distance_weight * services.ix[i,'TotalBudgt']
+    return(score)
+
+
+def linearDecayFunction(time, upper):
+    # penalty function for distance
+    # taken from https://github.com/GeoDaCenter/contracts/blob/master/analytics/ScoreModel.py
+    upper = float(upper)
+    time = float(time)
+    if time > upper:
+        return 0
+    else:
+        return (upper - time) / upper
+
+# def VendorLookup(cursor, id, kind):
+#     # look up the value for a specific record, such as Project or TotalBudgt
+#     # Note: this code is adapted from Logan Noel's code
+#     # https://github.com/GeoDaCenter/contracts/blob/master/analytics/ScoreModel.py
+# query = "SELECT {} FROM contracts WHERE ContractNo is {}".format(kind, id)
+# data = cursor.execute(query).fetchone()
+#     return(data)
+    
+
+def getVendorsForOrig(orig_id, cursor):
+    # get all of the vendors within reach of a given origin point
+    # note - doesn't actually get the duration (creates a column with 'None')
+    tmp = cursor.execute('''SELECT * FROM contracts 
+        WHERE dest_id IN 
+        (SELECT dest_id FROM destsubset WHERE orig_id={})'''
+        .format(orig_id))
+    services_tuple = tmp.fetchall()
+    # convert to pandas data frame
+    services_list = [x for x in services_tuple]
+    services_pd = pd.DataFrame(services_list, columns=getColNames(cursor, 'contracts'))
+    # add column for duration
+    services_pd['walking_time'] = None 
+    return(services_pd)   
 
 def createSubsetDataframe(cursor, max_dur):
     # create a pandas dataframe containing the O-D pairs for destinations that contain services
     # and adds it to the database
 
-    # get list of dest id's that contain the services of interest
-    tmp = cursor.execute("SELECT dest_id FROM contracts")
-    service_dest_ids_tuple = tmp.fetchall()
-    service_dest_ids = [x[0] for x in service_dest_ids_tuple]
+    # # get list of dest id's that contain the services of interest
+    # tmp = cursor.execute("SELECT dest_id FROM contracts")
+    # service_dest_ids_tuple = tmp.fetchall()
+    # service_dest_ids = [x[0] for x in service_dest_ids_tuple]
 
-    # filter the database to O-D pairs with duration < specified time
-    tmp = cursor.execute("SELECT * FROM origxdest WHERE walking_time < {}".format(max_dur))
+    # # filter the database to O-D pairs with duration < specified time
+    # tmp = cursor.execute("SELECT * FROM origxdest WHERE walking_time < {}".format(max_dur))
 
-
-    # tmp = cursor.execute('''SELECT * FROM origxdest 
-    # WHERE walking_time < {}
-    # AND dest_id IN (SELECT dest_id FROM contracts)'''.format(max_dur))
-
+    tmp = cursor.execute('''SELECT * FROM walking 
+    WHERE duration < {}
+    AND dest_id IN (SELECT dest_id FROM contracts)'''.format(max_dur))
+    #
     od_pairs = tmp.fetchall()
-
+    #
     # create pandas dataframe
     data_list = [[row[0], row[1], row[2]] for row in od_pairs]
     od_pairs = pd.DataFrame(data_list, columns=['orig_id', 'dest_id', 'walking_time'])
-    od_pairs = od_pairs.set_index('dest_id', inplace=True)
+    # od_pairs = od_pairs.set_index('dest_id', inplace=True)
 
-    # filter the 'origxdest' table to just these destinations
-    od_pairs_subset = od_pairs.ix[service_dest_ids]
+        # filter the 'origxdest' table to just these destinations
+        # od_pairs_subset = od_pairs.ix[service_dest_ids]
 
     # write this as a table in the database...
     # strings
-    cols_str = "orig_id VARCHAR (15), dest_id VARCHAR (15), walking_time REAL"
+    cols_str = "orig_id VARCHAR (15), dest_id VARCHAR (15), walking_time INT"
     col_names = ['orig_id', 'dest_id', 'walking_time']
     # convert index back to column and format data frame
-    od_pairs_subset['dest_id'] = od_pairs_subset.index
-    od_pairs_subset = od_pairs_subset[['orig_id', 'dest_id', 'walking_time']]
+    # od_pairs_subset['dest_id'] = od_pairs_subset.index
+    # od_pairs_subset = od_pairs_subset[['orig_id', 'dest_id', 'walking_time']]
     # add to data base
-    addPdToDb(od_pairs_subset, cursor, 'destsubset', cols_str, col_names)
+    addPdToDb(od_pairs, cursor, 'destsubset', cols_str, col_names)
+    db.commit()
 
-def addPdToDb(d_frame, db, new_table_name, cols_str, col_names):
+def addPdToDb(d_frame, cursor, new_table_name, cols_str, col_names):
     # add a pandas dataframe (d_frame) to a database (db)
-    #
+    # NOTE: this code is not generalizable (it adds the 3rd column as an int)
     # create new table
     add_table_str = "CREATE TABLE {}({})".format(new_table_name, cols_str)
     db.execute(add_table_str)
@@ -119,7 +170,8 @@ def addPdToDb(d_frame, db, new_table_name, cols_str, col_names):
     # add data
     add_data_str = "INSERT INTO {}({}) VALUES(?,?,?)".format(new_table_name, ', '.join(col_names))
     for i in range(d_frame.shape[0]):
-        cursor.execute(add_data_str, (d_frame.ix[i,:]))
+        # cursor.execute(add_data_str, (d_frame.ix[i,:]))
+        cursor.execute(add_data_str, (d_frame.ix[i,0],d_frame.ix[i,1],int(d_frame.ix[i,2])))
 
 def addLatLon(d_frame, cursor, table_name):
     # add lat and lon columns to the data
@@ -199,9 +251,10 @@ def getTabNames(db):
 
 def getColNames(cursor, table_name):
     tmp = cursor.execute("SELECT * FROM {}".format(table_name))
-    tmp.fetchall()
+    tmp.fetchone()
     nmes = [description[0] for description in tmp.description]
-    print(nmes)
+    # print(nmes)
+    return(nmes)
 
 # scratch
 

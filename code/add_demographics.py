@@ -1,6 +1,7 @@
 import pandas as pd
 import sqlite3
 import numpy as np
+import code
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -12,13 +13,13 @@ def main():
 
     # specify the file names
     dem_fn = '../data/nhgis0004_csv/nhgis0004_ds172_2010_block.csv'
-    db_fn =  '../query_results/sample_results_2.db'
+    db_fn =  '../query_results/combined-data_5km.db'
 
     # specify the attributes
     attr = {
-            'field' : 'pop_over_65',
+            'field' : 'pop',
             'census_code' : 'H7V001',
-            'custom' : True
+            'custom' : False
             }
 
     # connect to database
@@ -100,22 +101,22 @@ def WriteDB(df, db, attr):
 
     #Initialize connections to .db
     cursor = db.cursor()
-
+    # code.interact(local=locals())
     # add column
-    add_col_str = "ALTER TABLE orig ADD COLUMN {} REAL".format(attr['field'])
-    db.execute(add_col_str)
+    col_name = attr['field']
+    add_col_str = "ALTER TABLE orig ADD COLUMN {} INT".format(col_name)
+    db.execute(add_col_str) 
 
-    # loop data and add
-    add_data_str = "INSERT INTO orig({}) VALUES(?)".format(attr['field'])
     for i in range(len(df)):
-        if attr['custom']:
-            value = df.ix[i,attr['field']]
-        else:
-            value = df.ix[i,attr['census_code']]
-        # add data
-        db.execute(add_data_str, (value,))
+        add_data_str = "UPDATE orig SET {} =(?) WHERE orig_id=(?)".format(col_name)
+        value = int(df.values[i])
+        idx = df.index[i]
+        db.execute(add_data_str, (value, idx))
+    # commit
+    db.commit()
 
     logger.info('Complete')
+
 
 
 if __name__ == "__main__":
@@ -124,7 +125,23 @@ if __name__ == "__main__":
 
 
 
+# my_data = ({id=1, value='foo'}, {id=2, value='bar'})
+# # string add
+# data = df.T.to_dict('tuple')
+# add_data_str = "UPDATE orig SET {} =:value WHERE orig_id=:id".format(col_name)
+# cursor.executemany(add_data_str, data)
+# db.commit()
 
+    
+
+#     # add
+#     add_data_str = "UPDATE orig SET {} = ?".format(col_name)
+#     # list of tuples
+#     values = list(zip(df.tolist()))
+#     # add all into table
+#     db.executemany(add_data_str, values)
+#     # commit
+#     db.commit()
 
 
 
