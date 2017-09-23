@@ -46,7 +46,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-def main(limit=2000, mode='walking', port=5000):
+def main(limit=5000, mode='walking', port=5000):
     '''
     Input:
         - Two shapefiles with coordinates and generates transit times between each pair.
@@ -72,9 +72,10 @@ def main(limit=2000, mode='walking', port=5000):
     cursor = db.cursor()
 
     #Get length of data to process
-    cursor.execute('''SELECT COUNT(*) FROM origxdest 
-        WHERE euclidean < {}'''.format(float(limit)))
-    data_len = cursor.fetchone()[0]
+    BATCH_SIZE = 500
+    cursor.execute('''SELECT COUNT(*) FROM origxdest'''.format(float(limit))) 
+    data_len = cursor.fetchone()[0] / BATCH_SIZE
+    logger.info('Queries to execute: {}'.format(data_len))0]
 
     #Query .db
     cursor.execute('''SELECT origxdest.orig_id, origxdest.dest_id, orig_lon, orig_lat, 
@@ -88,7 +89,7 @@ def main(limit=2000, mode='walking', port=5000):
     if no_cores <= 10:
         no_cores -= 2
     else:
-        no_cores -= 6
+        no_cores -= 4
 
     #Form queue of workers
     queue = Queue()
@@ -103,29 +104,34 @@ def main(limit=2000, mode='walking', port=5000):
         actual = round(data_len * i / 20)
         percentages[actual] = round(i / 20 * 100)
 
+    query_start = time.time()
     #Add workers to queue (multiprocessing)
     logger.info('Started querying OSRM server')
     data = cursor.fetchone()
-
+    dests = []
+    prev_orig_id = ''
+    prev_orig_lon = ''
+    prev_orig_lat = ''
+    counter = 0
     while data:
-        pair = OrigDestPair(data[0], data[1], data[2], data[3], data[4], 
-                                data[5], percentages)
-        queue.put(pair)
+        dests.append((data[1], data[4], data[5]))
+        if (counter % BATCH_SIZE == 0 or prev_orig_id != data[0]) and counter != 0:
+            pair = OrigxMany(data[0], data[2], data[3], dests, percentages)
+            queue.put(pair)
+            dests = []
+        prev_orig_id = data[0]
+        prev_orig_lon = data[2]
+        prev_orig_lat = data[3]
+        counter += 1
         data = cursor.fetchone()
+    db.close()
     queue.join()
-    logger.info('Done querying OSRM server')
+    query_end = time.time()
+    logger.info('Done querying OSRM server ({} seconds)'.format(query_end - query_start))
 
-    #read to .db and clean up
-    logger.info('Transfering data to .db')
-    with open(temp_fn) as csvfile:
-        reader = csv.reader(csvfile)
-        for row in reader:
-            database.Write(row[0], row[1], row[2], mode, db_fn)
+    #transfer to .db
+    database.Write(mode, temp_fn, db_fn)
 
-    #clean up
-    #if os.path.isfile('temp-data.csv'):
-    #    os.remove('temp-data.csv')
-    #    logger.info('Deleting temp-data.csv')
 
     #show timer
     end = time.time()
@@ -153,24 +159,25 @@ def CheckRawData(db_fn, orig_fn, dest_fn, temp_fn, db_temp_fn, mode):
         os.remove(temp_fn)
         logger.info('Deleting old temp data')
 
-class OrigDestPair():
+    with open(temp_fn, 'a', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['0','1','2'])
+
+class OrigxMany():
     '''
     Data structure containing the data for a single query to the OSRM server.
     '''
     id_ = 0
-    def __init__(self, orig_id, dest_id, orig_lon, orig_lat, dest_lon,
-                 dest_lat, percentages):
-        if OrigDestPair.id_ in percentages:
-            self.completion = percentages[OrigDestPair.id_]
+    def __init__(self, orig_id, orig_lon, orig_lat, dests, percentages):
+        if OrigxMany.id_ in percentages:
+            self.completion = percentages[OrigxMany.id_]
         else:
             self.completion = None
         self.orig_id = orig_id
-        self.dest_id = dest_id
+        self.dests = dests
         self.orig_lon = orig_lon
         self.orig_lat = orig_lat
-        self.dest_lon = dest_lon
-        self.dest_lat = dest_lat
-        OrigDestPair.id_ += 1
+        OrigxMany.id_ += 1
 
 
 class QueryWorker(Thread):
@@ -198,29 +205,30 @@ def QueryOSRM(pair, port, mode, temp_fn):
     which this function then parses and writes to file
     '''
     #Form and parse server request
-    url = 'http://ioe-picturedrocks.engin.umich.edu:{}/route/v1/{}/{},{};{},{}?overview=false'.format(port,mode,pair.orig_lon,pair.orig_lat,pair.dest_lon,pair.dest_lat)
-    # url = 'http://localhost:{}/route/v1/{}/{},{};{},{}?overview=false'.format(port,mode,pair.orig_lon,pair.orig_lat,pair.dest_lon,pair.dest_lat)
+    base_query = 'http://localhost:{}/table/v1/{}/{},{}'.format(port,mode,pair.orig_lon,pair.orig_lat)
+    mid_query = ''
+    end_query = '?sources=0'
+
+    for i, dest_data in enumerate(pair.dests):
+        dest_id, dest_lon, dest_lat = dest_data
+        mid_query += ';' + str(dest_lon) + ',' + str(dest_lat)
+
+
+    url = base_query + mid_query + end_query
     r = requests.get(url)
-    duration = round(float(r.json()['routes'][0]['duration']),2)
 
-    #Initialize connection to .db and update data
-    #db = sqlite3.connect('combined-data.db',timeout=60)
-    #cursor = db.cursor()
-    #insert_str = '''UPDATE origxdest SET {}_time = {}
-    #WHERE orig_id IS \'{}\' AND dest_id IS \'{}\''''.format(mode, duration, pair.orig_id, pair.dest_id)
-    #cursor.execute(insert_str)
-    #db.commit()
+    res = r.json()['durations'][0][1:]
 
-    #Close connection to .db
-    #db.close()
     with open(temp_fn, 'a', newline='') as f:
         writer = csv.writer(f)
-        fields = [pair.orig_id, pair.dest_id, duration]
-        writer.writerow(fields)
+        for i, dest_data in enumerate(pair.dests):
+            dest_id, dest_lon, dest_lat = dest_data
+            fields = [pair.orig_id, dest_id, int(res[i])]
+  
+            writer.writerow(fields)
     if pair.completion:
         logger.info("{} percent completed querying task".format(pair.completion))   
 
-    return
     
 
 

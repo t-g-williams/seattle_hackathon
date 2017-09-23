@@ -68,9 +68,10 @@ def Init(db_fn, orig_fn, dest_fn, db_temp_fn):
 
     # init the dest-orig table
     cursor1.execute('''
-        CREATE TABLE origxdest(orig_id VARCHAR (20), dest_id VARCHAR (20), walking_time REAL, 
-        driving_time REAL, transit_time REAL, euclidean REAL)
+        CREATE TABLE origxdest(orig_id VARCHAR (15), dest_id VARCHAR (15), euclidean INTEGER)
         ''')
+    cursor1.execute('CREATE TABLE walking(orig_id VARCHAR (15), dest_id VARCHAR (15), duration INTEGER)')
+   
     
     #Close connections to .db's
     db.close()
@@ -78,18 +79,26 @@ def Init(db_fn, orig_fn, dest_fn, db_temp_fn):
     logger.info('Finished generating temp-data.db and combined-data.db')
 
 
-def Write(orig_id, dest_id, duration, mode, db_fn):
-    db = sqlite3.connect(db_fn,timeout=60)
+def Write(mode, temp_fn, db_fn):
+    #read to .db and clean up
+    logger.info('Transfering data to .db')
+    db_start = time.time()
+
+    db = sqlite3.connect(db_fn) 
     cursor = db.cursor()
-    insert_str = '''UPDATE origxdest SET {}_time = {}
-    WHERE orig_id IS \'{}\' AND dest_id IS \'{}\''''.format(mode, duration, orig_id, dest_id)
-    cursor.execute(insert_str)
+
+    with open(temp_fn, 'r') as fin: 
+        dr = csv.DictReader(fin) 
+        to_db = [(i['0'], i['1'], i['2']) for i in dr]
+    insert_str = '''INSERT INTO {}(orig_id, dest_id, duration) VALUES (?, ?, ?)'''.format(mode)
+    cursor.executemany(insert_str, to_db)
     db.commit()
 
     #Close connection to .db
     db.close()
+    db_end = time.time()
+    logger.info('Transferred data to .db ({} seconds)'.format(db_end - db_start))
 
-    return
 
 
 def ReadShapefile(source, filename, sample = False):
@@ -129,6 +138,7 @@ def ReadShapefile(source, filename, sample = False):
     df.set_index(new_indx, inplace=True)
     # if testing the code
     if sample:
-        df = df.sample(n=200)
+        logger.warning('WARNING: Sampling data-not a full run')
+        df = df.sample(n=400, random_state=5)
     logger.info('Shapefile ' + source + ' read into dataframe')
     return df
