@@ -50,12 +50,14 @@ def calcWalkScores(cursor, db, max_dur):
     logger.info('calculating walk scores')
     orig_ids = getTable(cursor, 'orig', [0], ['orig_id'])
     scores_dict = {}
+    
     # Loop through each origin id
     for i in range(len(orig_ids)):
         if i % 100 == 0:
             print('i = {} / {}'.format(i, len(orig_ids)))
         # find all services within 30min of this orig
         services_pd = getVendorsForOrig(orig_ids.ix[i][0], cursor)
+        
         # loop through the services
         for j in range(services_pd.shape[0]):
             # get the duration to this service
@@ -65,9 +67,11 @@ def calcWalkScores(cursor, db, max_dur):
             duration = tmp.fetchall()
             # add to data frame
             services_pd.ix[j, 'walking_time'] = duration [0][0]
+        
         # CALCULATE WALKING SCORE
         score = calcHSSAScore(services_pd, cursor, max_dur)
         scores_dict[orig_ids.ix[i][0]] = score  
+    
     # add scores to database
     scores_pd = pd.DataFrame({'orig_id' : list(scores_dict.keys()), 'score' : list(scores_dict.values())})
     # normalize the scores
