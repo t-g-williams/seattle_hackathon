@@ -12,7 +12,7 @@ def main():
     # sf_readname = '../data/Neighborhoods/Neighborhoods'
     sf_readname = '../data/block_data/sea_blocks_wgs84'
     db_fn =  '../query_results/combined-data_5km_orig.db'
-    outname = 'block_data.gj'
+    outname = 'block_data.txt'
     id_col_num = 6
 
     # get the shapefile data
@@ -56,24 +56,22 @@ def createGeoJson(shape_data, attr_data, outname):
     # create a geojson with coordinates from shape_data and other information from attr_data
     # do this by building up a dictionary
 
-    gj_dict = {}
-    gj_dict['type'] = 'FeatureCollection'
-    gj_dict['features'] = [{'geometry' : {'type' : 'GeometryCollection', 'geometries' : []}}]
+    # gj_dict = {}
+    # gj_dict['type'] = 'FeatureCollection'
+    # gj_dict['features'] = [{'geometry' : {'type' : 'GeometryCollection', 'geometries' : []}}]
     # print(shape_data['530330095001063'])
-    # add elements to the geometries - loop through the shapes
-
+    gj_list = []
     data_types = list(attr_data.columns.values)
 
-
+    # add elements to the geometries - loop through the shapes
     for block_id, coords in shape_data.items():
-        # find matching row in attr_data
-        print('in loop')
-        print(block_id)
+        block_dict = {}
 
+        # find matching row in attr_data
         block_data = attr_data.ix[block_id]
-        print(block_data)
         # hssa_score = block_data['HSSAscore']
         
+        # create dictionary of the data
         block_data_dict = {}
         for type in data_types:
             block_data_dict[type] = block_data.ix[type]
@@ -83,16 +81,21 @@ def createGeoJson(shape_data, attr_data, outname):
         for elem in coords:
             coords_list.append([elem[0] ,elem[1]])
 
-        # add to the dictionary
-        shape_dict = {'type' : 'Polygon', 'coordinates' : coords_list}
-        # add in the block data, 'HSSAscore' : hssa_score}
-        shape_dict.update(block_data_dict)
-        # append to master dictionary
-        gj_dict['features'][0]['geometry']['geometries'].append(shape_dict)
+        # add coordinates to dictionary
+        block_dict['coordinates'] = coords_list
+        # shape_dict = {'type' : 'Polygon', 'coordinates' : coords_list}
+
+        # add the block data to the dictionary
+        block_dict.update(block_data_dict)
+
+        # append to master list
+        gj_list.append(block_dict)
+        # gj_dict['features'][0]['geometry']['geometries'].append(shape_dict)
 
     # write the json file
     with open(outname, 'w') as file:
-        file.write(json.dumps(gj_dict))
+        file.write(json.dumps(gj_list
+            ))
 
 def getTable(cursor, table_name, col_nums, col_names):
     # get table 'table_name' from the database
