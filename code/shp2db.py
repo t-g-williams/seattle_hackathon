@@ -3,12 +3,11 @@ import geopandas as gpd
 import pandas as pd
 import numpy as np
 import sqlite3
-
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-import code
+
 
 def main():
     '''

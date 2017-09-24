@@ -6,14 +6,47 @@ import pandas as pd
 import geojson
 import json
 import pickle
+import code
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def main():
-    # import shapefile and get data
-    # sf_readname = '../data/Neighborhoods/Neighborhoods'
-    sf_readname = '../data/block_data/sea_blocks_wgs84'
-    db_fn =  '../query_results/combined-data_5km_orig.db'
-    outname = 'block_data.txt'
-    id_col_num = 6
+    #### select aggregation
+    levels = ['district', 'neighborhood', 'block']
+
+    for level in levels:
+        logger.info('Level = {}'.format(level))
+        createPlotData(level)
+
+
+def createPlotData(level):
+    # neighborhood
+    if level == 'neighborhood':
+        table_name = 'neighborhood'
+        sf_readname = '../data/Neighborhoods/Neighborhoods'
+        db_fn =  '../query_results/sea_boundaries.db'
+        id_col_num = 3
+        db_id_col_name = 'area_id'
+        outname = '../data/frontend_plotting/neighborhood_data.txt'
+
+    # district
+    if level == 'district':
+        table_name = 'district'
+        sf_readname = '../data/Council_Districts/Council_Districts'
+        db_fn =  '../query_results/sea_boundaries.db'
+        id_col_num = 1
+        db_id_col_name = 'area_id'
+        outname = '../data/frontend_plotting/district_data.txt'
+    
+    # blocks
+    if level == 'block':
+        table_name = 'orig'
+        sf_readname = '../data/block_data/sea_blocks_wgs84'
+        db_fn =  '../query_results/combined-data_5km_orig.db'
+        id_col_num = 6
+        db_id_col_name = 'orig_id'
+        outname = '../data/frontend_plotting/block_data.txt'
 
     # get the shapefile data
     shape_data = getShapeData(sf_readname, id_col_num)
@@ -21,13 +54,14 @@ def main():
     # import database table (data)
     db = sqlite3.connect(db_fn)
     cursor = db.cursor()
-    walk_data = getTable(cursor, 'orig', [0,1,2,3,4,5,6], getColNames(cursor, 'orig'))
+    # walk_data = getTable(cursor, 'orig', [0,1,2,3,4,5,6], getColNames(cursor, 'orig'))
+    c_names = getColNames(cursor, table_name)
+    walk_data = getTable(cursor, table_name, list(range(len(c_names))), c_names)
     # set index
-    walk_data.set_index('orig_id', inplace=True)
+    walk_data.set_index(db_id_col_name, inplace=True)
 
     # link these together, and export gj file
     createGeoJson(shape_data, walk_data, outname)
-
 
 
 def getShapeData(sf_readname, id_col_num):
@@ -43,7 +77,7 @@ def getShapeData(sf_readname, id_col_num):
     # loop through shapes
     for i in range(len(sfrec)):
         # get the blockid and coords
-        block_id = sfrec[i].record[6]
+        block_id = sfrec[i].record[id_col_num]
         block_coords = shapes[i].points
 
         # create dict
@@ -68,18 +102,22 @@ def createGeoJson(shape_data, attr_data, outname):
         block_dict = {}
 
         # find matching row in attr_data
-        block_data = attr_data.ix[block_id]
-        # hssa_score = block_data['HSSAscore']
+        # print(attr_data)
+        # print(block_id)
+        block_data = attr_data.ix[str(block_id)]
+        # print(block_data)
+        # code.interact(local=locals())
         
         # create dictionary of the data
         block_data_dict = {}
         for type in data_types:
             block_data_dict[type] = block_data.ix[type]
+        block_data_dict.update({'id' : block_id})
         
         # convert coordinates to list of lists
         coords_list = []
         for elem in coords:
-            coords_list.append([elem[0] ,elem[1]])
+            coords_list.append([elem[1] ,elem[0]])
 
         # add coordinates to dictionary
         block_dict['coordinates'] = coords_list

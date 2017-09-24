@@ -7,11 +7,15 @@
 import pandas as pd
 import numpy as np
 import sqlite3
+import code
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def main():
     # file names and parameters
-    db_fn =  '../query_results/combined-data_5km_contracts.db'
-    db_fn =  '../query_results/sample_results_2.db'
+    db_fn =  '../query_results/combined-data_5km.db'
+    # db_fn =  '../query_results/sample_results_2.db'
     max_dur = 30*60 # 30 minutes
 
     subsetDatabase(db_fn, max_dur)
@@ -19,15 +23,16 @@ def main():
 
 def subsetDatabase(db_fn, max_dur):
     # create connection to the database
-db = sqlite3.connect(db_fn)
-cursor = db.cursor()
+    logger.info('subsetting the database')
+    db = sqlite3.connect(db_fn)
+    cursor = db.cursor()
 
     # create a dataframe with only the relevant O-D pairs
     createSubsetDataframe(cursor, max_dur)
 
     # calculate walk scores for origins
-    calcWalkScores(cursor, max_dur)
-
+    calcWalkScores(cursor, db, max_dur)
+    print('finished')
     # # add origin lat and lon (for plotting)
     # od_pairs = addLatLon(od_pairs, cursor, 'orig')
 
@@ -39,10 +44,10 @@ cursor = db.cursor()
     # od_pairs = addDemographicData(od_pairs, cursor, 'orig', dem_ids)
 
 
-def calcWalkScores(cursor, max_dur):
+def calcWalkScores(cursor, db, max_dur):
     # calculate the walk score for each origin
-
     # get np.DataFrame of orig ids
+    logger.info('calculating walk scores')
     orig_ids = getTable(cursor, 'orig', [0], ['orig_id'])
     scores_dict = {}
     # Loop through each origin id
@@ -62,9 +67,36 @@ def calcWalkScores(cursor, max_dur):
             services_pd.ix[j, 'walking_time'] = duration [0][0]
         # CALCULATE WALKING SCORE
         score = calcHSSAScore(services_pd, cursor, max_dur)
-        scores_dict[orig_ids.ix[i][0]] = score
+        scores_dict[orig_ids.ix[i][0]] = score  
     # add scores to database
+    scores_pd = pd.DataFrame({'orig_id' : list(scores_dict.keys()), 'score' : list(scores_dict.values())})
+    # normalize the scores
+    scores_pd['score'] = int(100 * scores_pd['score'] / max(scores_pd['score']))
+    print('...normalized the scores')
+    WriteDB(scores_pd, db, 'HSSAscore')
+    db.commit()
 
+def WriteDB(df, db, col_name):
+    '''
+    Add table to db
+    '''
+    logger.info('Writing to DB')
+    #Initialize connections to .db
+    cursor = db.cursor()
+    # code.interact(local=locals())
+    # add column
+    # col_name = attr['field']
+    add_col_str = "ALTER TABLE orig ADD COLUMN {} REAL".format(col_name)
+    db.execute(add_col_str) 
+    for i in range(len(df)):
+        add_data_str = "UPDATE orig SET {} =(?) WHERE orig_id=(?)".format(col_name)
+        value = df.values[i][1]
+        idx = df.values[i][0]
+        db.execute(add_data_str, (value, idx))
+    # commit
+    db.commit()
+
+    # logger.info('Complete')
 
 
 def calcHSSAScore(services, cursor, max_dur):
@@ -134,7 +166,7 @@ def createSubsetDataframe(cursor, max_dur):
 
     # # filter the database to O-D pairs with duration < specified time
     # tmp = cursor.execute("SELECT * FROM origxdest WHERE walking_time < {}".format(max_dur))
-
+    logger.info('subsetting the walking results table')
     tmp = cursor.execute('''SELECT * FROM walking 
     WHERE duration < {}
     AND dest_id IN (SELECT dest_id FROM contracts)'''.format(max_dur))
@@ -144,11 +176,6 @@ def createSubsetDataframe(cursor, max_dur):
     # create pandas dataframe
     data_list = [[row[0], row[1], row[2]] for row in od_pairs]
     od_pairs = pd.DataFrame(data_list, columns=['orig_id', 'dest_id', 'walking_time'])
-    # od_pairs = od_pairs.set_index('dest_id', inplace=True)
-
-        # filter the 'origxdest' table to just these destinations
-        # od_pairs_subset = od_pairs.ix[service_dest_ids]
-
     # write this as a table in the database...
     # strings
     cols_str = "orig_id VARCHAR (15), dest_id VARCHAR (15), walking_time INT"
@@ -158,15 +185,14 @@ def createSubsetDataframe(cursor, max_dur):
     # od_pairs_subset = od_pairs_subset[['orig_id', 'dest_id', 'walking_time']]
     # add to data base
     addPdToDb(od_pairs, cursor, 'destsubset', cols_str, col_names)
-    db.commit()
+    return
 
 def addPdToDb(d_frame, cursor, new_table_name, cols_str, col_names):
     # add a pandas dataframe (d_frame) to a database (db)
     # NOTE: this code is not generalizable (it adds the 3rd column as an int)
     # create new table
     add_table_str = "CREATE TABLE {}({})".format(new_table_name, cols_str)
-    db.execute(add_table_str)
-    #
+    cursor.execute(add_table_str)
     # add data
     add_data_str = "INSERT INTO {}({}) VALUES(?,?,?)".format(new_table_name, ', '.join(col_names))
     for i in range(d_frame.shape[0]):
@@ -255,6 +281,11 @@ def getColNames(cursor, table_name):
     nmes = [description[0] for description in tmp.description]
     # print(nmes)
     return(nmes)
+
+
+
+if __name__ == '__main__':
+    main()
 
 # scratch
 

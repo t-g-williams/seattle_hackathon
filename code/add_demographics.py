@@ -13,13 +13,13 @@ def main():
 
     # specify the file names
     dem_fn = '../data/nhgis0004_csv/nhgis0004_ds172_2010_block.csv'
-    db_fn =  '../query_results/combined-data_5km.db'
+    db_fn =  '../query_results/sea_5km_orig.db'
 
     # specify the attributes
     attr = {
-            'field' : 'pop',
+            'field' : 'pop_over_65',
             'census_code' : 'H7V001',
-            'custom' : False
+            'custom' : True
             }
 
     # connect to database
@@ -40,7 +40,7 @@ def ImportDemographics(dem_fn, attr, cursor):
     dem_colname (list of str) = column name(s) of the demographic data to be added to the database
     db_fn (str) = full path and filename of the origins database
     '''
-    logger.info('Importing demographics')
+    logger.info('Importing demographics: ' + attr['field'])
 
     # import demographic data (csv)
     df = pd.read_csv(dem_fn, header = 0,  
@@ -77,15 +77,25 @@ def CalculateDemographic(df, attr):
     '''
     logger.info('Calculating other fields')
 
-    # which census codes will you sum?
-    census_codes = ['H76020', 'H76021', 'H76022', 'H76023', 'H76024', 'H76025',
-                    'H76044', 'H76045', 'H76046', 'H76047', 'H76048', 'H76049']
-
     # var name defined in main
     var_name = attr['field']
 
-    # add column
-    df[var_name] = df[census_codes].sum(1)
+    # which census codes will you sum?
+    if var_name == 'pop_over_65':
+        # consider population over 65
+        census_codes = ['H76020', 'H76021', 'H76022', 'H76023', 'H76024', 'H76025',
+                        'H76044', 'H76045', 'H76046', 'H76047', 'H76048', 'H76049']
+        
+        # add column
+        df[var_name] = df[census_codes].sum(1)
+    elif var_name == 'people_of_color':
+        # consider people of color
+        # census_code = [,'XXXX']
+        # add column
+        df[var_name] = df['H7V001'] - df['XXXX']  ###### add the code for number of white people
+
+
+    
 
     #subset
     df = df[var_name]
