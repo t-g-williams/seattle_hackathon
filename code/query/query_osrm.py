@@ -46,7 +46,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-def main(limit=2000, mode='walking', port=5000):
+def main(limit=5000, mode='walking', port=5000):
     '''
     Input:
         - Two shapefiles with coordinates and generates transit times between each pair.
@@ -54,11 +54,11 @@ def main(limit=2000, mode='walking', port=5000):
         - combined-data.db (SQL)
     '''
     # shapefiles
-    orig_fn = '../data/block_data/sea_blocks_wgs84.shp' 
-    dest_fn = '../data/block_data/sea_blocks_wgs84.shp' 
-    db_fn = '../query_results/combined-data_2kmb.db'
-    temp_fn = '../query_results/temp-data_2kmb.csv'
-    db_temp_fn = '../query_results/temp-data_2kmb.db'
+    orig_fn = '../data/por_block/por_blocks.shp' 
+    dest_fn = orig_fn
+    db_fn = '../query_results/por_5km.db'
+    temp_fn = '../query_results/por-temp_5km.csv'
+    db_temp_fn = '../query_results/por-temp_5km.db'
 
     # logger
     logger.info("Started with limit {} meters and mode {} on port {}".format(limit, mode, port))

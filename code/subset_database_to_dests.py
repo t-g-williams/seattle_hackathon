@@ -14,11 +14,13 @@ logger = logging.getLogger(__name__)
 
 def main():
     # file names and parameters
-    db_fn =  '../query_results/combined-data_5km.db'
-    # db_fn =  '../query_results/sample_results_2.db'
+    db_fn =  '../query_results/combined-data_5km_with_hssa.db'
+    db_fn =  '../query_results/sea_hospital_5km.db'
     max_dur = 30*60 # 30 minutes
 
+    # run main function
     subsetDatabase(db_fn, max_dur)
+    db.close()
 
 
 def subsetDatabase(db_fn, max_dur):
@@ -28,57 +30,100 @@ def subsetDatabase(db_fn, max_dur):
     cursor = db.cursor()
 
     # create a dataframe with only the relevant O-D pairs
-    createSubsetDataframe(cursor, max_dur)
+    if 'destsubset' not in getTabNames(db):
+        createSubsetDataframe(cursor, max_dur)
+        db.commit()
 
     # calculate walk scores for origins
     calcWalkScores(cursor, db, max_dur)
-    print('finished')
-    # # add origin lat and lon (for plotting)
-    # od_pairs = addLatLon(od_pairs, cursor, 'orig')
-
-    # # add the contract data
-    # od_pairs = addContractData(od_pairs, cursor, 'contracts')
-
-    # # add demographic data
-    # dem_ids = {'pop' : 3, 'pop_over_65' : 4}
-    # od_pairs = addDemographicData(od_pairs, cursor, 'orig', dem_ids)
-
+    print('finished!!')
 
 def calcWalkScores(cursor, db, max_dur):
     # calculate the walk score for each origin
     # get np.DataFrame of orig ids
     logger.info('calculating walk scores')
-    orig_ids = getTable(cursor, 'orig', [0], ['orig_id'])
+    orig_ids = getTable(cursor, 'orig', [0, 4], ['orig_id', 'pop_over_65'])
     scores_dict = {}
-    
+    # initialize the amount of people for each contract
+    contract_per_cap = {}
+    contract_data = getTable(cursor, 'contracts', [0, 3], ['ContractNo', 'TotalBudgt'])
+    for i in range(contract_data.shape[0]):
+        contract_per_cap[contract_data.ix[i,'ContractNo']] = {'amt' : contract_data.ix[i,'TotalBudgt'], 'ppl' : 0}
+
+    # initialize dictionary to store contracts for each origin
+    orig_contracts = {}
+
     # Loop through each origin id
-    for i in range(len(orig_ids)):
+    for i in range(orig_ids.shape[0]):
         if i % 100 == 0:
-            print('i = {} / {}'.format(i, len(orig_ids)))
+            print('i = {} / {}'.format(i, orig_ids.shape[0]))
         # find all services within 30min of this orig
-        services_pd = getVendorsForOrig(orig_ids.ix[i][0], cursor)
-        
+        services_pd = getVendorsForOrig(orig_ids.ix[i, 'orig_id'], cursor).drop_duplicates()
+        # initialize contract list for orig i
+        orig_contracts[orig_ids.ix[i,'orig_id']] = {'contracts' : [], 'pop' : orig_ids.ix[i, 'pop_over_65']}
         # loop through the services
         for j in range(services_pd.shape[0]):
             # get the duration to this service
             tmp = cursor.execute('''SELECT walking_time FROM destsubset 
                 WHERE dest_id={} AND orig_id={}'''
-                .format(services_pd.ix[j, 'dest_id'], orig_ids.ix[i][0]))
+                .format(services_pd.ix[j, 'dest_id'], orig_ids.ix[i, 'orig_id']))
             duration = tmp.fetchall()
             # add to data frame
-            services_pd.ix[j, 'walking_time'] = duration [0][0]
-        
+            services_pd.ix[j, 'walking_time'] = duration[0][0]
+            # add origin pop to the services funding count
+            contract_per_cap[services_pd.ix[j, 'ContractNo']]['ppl'] += orig_ids.ix[i,'pop_over_65']
+            # add contract id to the origin's contracts
+            orig_contracts[orig_ids.ix[i,'orig_id']]['contracts'].append(services_pd.ix[j, 'ContractNo'])
         # CALCULATE WALKING SCORE
         score = calcHSSAScore(services_pd, cursor, max_dur)
-        scores_dict[orig_ids.ix[i][0]] = score  
+        scores_dict[orig_ids.ix[i,'orig_id']] = {'HSSA' : score}
     
+    # code.interact(local=locals())  
+    # calculate per capita spending for each contract
+    contract_per_cap = calcPerCapSpending(contract_data, contract_per_cap)
+    # calculate spending per origin (update the scores dictionary with this data)
+    scores_dict = calcOrigFunding(orig_contracts, contract_per_cap, scores_dict)
+
     # add scores to database
-    scores_pd = pd.DataFrame({'orig_id' : list(scores_dict.keys()), 'score' : list(scores_dict.values())})
+    HSSAs = [val['HSSA'] for val in scores_dict.values()]
+    investments = [val['investment'] for val in scores_dict.values()]
+    # scores_pd = pd.DataFrame({'orig_id' : list(scores_dict.keys()), 'score' : HSSAs, 'investment' : investments})
+    scores_pd = pd.DataFrame({'orig_id' : list(scores_dict.keys()), 'investment' : investments})
     # normalize the scores
-    scores_pd['score'] = int(100 * scores_pd['score'] / max(scores_pd['score']))
+    
+    # scores_pd['score'] = (100 * scores_pd['score'].divide(max(scores_pd['score']))).astype(int)
     print('...normalized the scores')
-    WriteDB(scores_pd, db, 'HSSAscore')
+    code.interact(local=locals()) 
+    WriteDB(scores_pd, db, 'investment')
     db.commit()
+
+def calcOrigFunding(orig_contracts, contract_per_cap, scores_dict):
+    ''' 
+    calculate the amount of funding (per capita) to be apportioned to each origin
+    using the contracts that each orign has within their walkshed
+    and the per capita funding of each service
+    add this to scores_dict
+    '''
+    output_dict = {}
+    for orig_id, orig_data in orig_contracts.items():
+        orig_spending = 0
+        for contract_id in orig_data['contracts']:
+            per_cap_spend = contract_per_cap[contract_id]['per_cap']
+            orig_spending += per_cap_spend * orig_data['pop']
+        scores_dict[orig_id].update({'investment' : orig_spending})
+    return(scores_dict)
+
+def calcPerCapSpending(contract_data, contract_per_cap):
+    # for each contract, create key for per capita spending and add to dictionary
+    for i in range(contract_data.shape[0]):
+        dict_i = contract_per_cap[contract_data.ix[i,'ContractNo']]
+        # calculate per capita spending
+        if dict_i['ppl']:
+            d_per_cap = {'per_cap' : dict_i['amt'] / dict_i['ppl']}
+        else:
+            d_per_cap = {'per_cap' : 0}     
+        dict_i.update(d_per_cap)
+    return(contract_per_cap)
 
 def WriteDB(df, db, col_name):
     '''
@@ -104,9 +149,11 @@ def WriteDB(df, db, col_name):
 
 
 def calcHSSAScore(services, cursor, max_dur):
-    # Calculate the HSSA score for a given origin
-    # Note: this code is adapted from Logan Noel's code
-    # https://github.com/GeoDaCenter/contracts/blob/master/analytics/ScoreModel.py
+    ''' 
+    Calculate the HSSA score for a given origin
+    Note: this code is adapted from Logan Noel's code
+    https://github.com/GeoDaCenter/contracts/blob/master/analytics/ScoreModel.py
+    '''
     WEIGHTS = [.1, .25, .5, .75, 1]
     weight_dict = {}
     score = 0
@@ -277,7 +324,9 @@ def getTable(cursor, table_name, col_nums, col_names):
 
 def getTabNames(db):
     nms = db.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    [print(nm) for nm in nms]
+    names = [nm[0] for nm in nms]
+    return(names)
+
 
 def getColNames(cursor, table_name):
     tmp = cursor.execute("SELECT * FROM {}".format(table_name))

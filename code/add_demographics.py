@@ -6,20 +6,24 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def main():
-    '''
+
+def main(field):
+
+    ''' 
     Append selected demographic data to the origin database
     '''
 
     # specify the file names
-    dem_fn = '../data/nhgis0004_csv/nhgis0004_ds172_2010_block.csv'
-    db_fn =  '../query_results/sea_5km_orig.db'
+    dem_fn = '../data/demographic/nhgis0002_ds172_2010_block.csv'
+    # db_fn =  '../query_results/sea_5km_block.db'
+    db_fn =  '../query_results/sea_5km.db'
+
+    # for x in range(0,len(fields)):
 
     # specify the attributes
     attr = {
-            'field' : 'pop_over_65',
-            'census_code' : 'H7V001',
-            'custom' : True
+            'field' : field[0], #'pop_above_65', 'pop_over_65', 'female','pop_below_10','people_of_color'
+            'census_code' : field[1],
             }
 
     # connect to database
@@ -60,25 +64,22 @@ def ImportDemographics(dem_fn, attr, cursor):
 
     ###
     # If you need to do calculations on the dataset, do it here
-    if attr['custom']:
-        df = CalculateDemographic(df,attr)
+    if isinstance(attr['census_code'], str):
+        df = df[attr['census_code']]
     else:
         # subset by census code columns 
-        df = df[attr['census_code']]
+        df = CalculateDemographic(df,attr['field'])
     
     return df
 
 
-def CalculateDemographic(df, attr):
+def CalculateDemographic(df, var_name):
     '''
     If you need to calculate values for the demographic
     e.g. merge add groups
     do it here
     '''
     logger.info('Calculating other fields')
-
-    # var name defined in main
-    var_name = attr['field']
 
     # which census codes will you sum?
     if var_name == 'pop_over_65':
@@ -88,15 +89,23 @@ def CalculateDemographic(df, attr):
         
         # add column
         df[var_name] = df[census_codes].sum(1)
-    elif var_name == 'people_of_color':
+    elif var_name == 'pop_color':
         # consider people of color
         # census_code = [,'XXXX']
-        # add column
-        df[var_name] = df['H7V001'] - df['XXXX']  ###### add the code for number of white people
-
-
-    
-
+        # add column people of color = (Total - white)
+        df[var_name] = df['H7X001'] - df['H7X002']  ###### add the code for number of white people
+    # consider population below 10 
+    elif var_name == 'pop_below_10':
+        # conside people of color 
+        census_codes = ['H76003','H76004',
+                        'H76027','H76028'] 
+        df[var_name] = df[census_codes].sum(1)
+    # consider female population 
+    elif var_name == 'pop_female':
+        census_codes = ['H76027', 'H76028', 'H76029','H76030','H76031','H76032','H76033','H76034',
+                        'H76035','H76036','H76037','H76038','H76039','H76040','H76041','H76042',
+                        'H76043','H76044','H76045','H76046','H76047','H76048','H76049']
+        df[var_name] = df[census_codes].sum(1)
     #subset
     df = df[var_name]
     return df
@@ -127,81 +136,10 @@ def WriteDB(df, db, attr):
 
     logger.info('Complete')
 
-
+fields = [('pop_female','H76026'),('pop_below_10',True),('pop_color',True), ('pop_total','H76001'), ('pop_over_65', True)]
 
 if __name__ == "__main__":
-    main()
+    for field in fields:
+        main(field)
 
 
-
-
-# my_data = ({id=1, value='foo'}, {id=2, value='bar'})
-# # string add
-# data = df.T.to_dict('tuple')
-# add_data_str = "UPDATE orig SET {} =:value WHERE orig_id=:id".format(col_name)
-# cursor.executemany(add_data_str, data)
-# db.commit()
-
-    
-
-#     # add
-#     add_data_str = "UPDATE orig SET {} = ?".format(col_name)
-#     # list of tuples
-#     values = list(zip(df.tolist()))
-#     # add all into table
-#     db.executemany(add_data_str, values)
-#     # commit
-#     db.commit()
-
-
-
-# def scratch():
-#     # get table names
-#     nms = db.execute("SELECT name FROM sqlite_master WHERE type='table';")
-#     [print(nm) for nm in nms]
-
-#         # create new table in database containing relevant info
-#     new_table_str = "CREATE TABLE dem(orig_id VARCHAR (20), " + ' REAL, '.join(dem_colnames) + ' REAL)'
-#     cursor.execute(new_table_str)
-#     # add data to this table
-#     add_dem_data_str = "INSERT INTO dem VALUES"
-
-#     # create new table with origin ids from the demographic data
-#     new_table_str = "CREATE TABLE dem(orig_id VARCHAR (20))"
-#     cursor.execute(new_table_str)
-#     db.execute("INSERT INTO dem(orig_id) VALUES(?)", dem_data[][dem_orig_id])
-
-
-#     # add demographic columns to this table
-#     add_col_str = "ALTER TABLE dem ADD COLUMN {} REAL"
-#     add_data_str = "INSERT INTO dem({}) VALUES(?)"
-#     for c_name in dem_colnames:
-#         # add column to table
-#         db.execute(add_col_str.format(c_name))
-#         # add data
-#         db.execute(add_data_str.format(c_name), dem_data[][c_name])
-
-
-#     vals = ['?'] * len(atr.fields)
-#     orig_str = 'INSERT INTO {}('.format(atr.name) + ', '.join(atr.fields) + ') VALUES(' + ', '.join(vals) + ')'  
-
-#     for row in df.iterrows():
-#         include = tuple([x for x in row[1]])
-#         cursor.execute(orig_str, include)
-#         db.commit()
-
-#     #Create tables
-#     create_table_str = [ x + ' ' + y for (x, y) in zip(atr.fields, atr.dtypes)] 
-#     create_table_str = ', '.join(create_table_str)
-#     create_table = 'CREATE TABLE {}('.format(atr.name) + create_table_str + ')'
-#     cursor.execute(create_table)
-#     db.commit()
-
-#     #Populate tables with source data
-#     vals = ['?'] * len(atr.fields)
-#     orig_str = 'INSERT INTO {}('.format(atr.name) + ', '.join(atr.fields) + ') VALUES(' + ', '.join(vals) + ')'  
-
-#     for row in df.iterrows():
-#         include = tuple([x for x in row[1]])
-#         cursor.execute(orig_str, include)
-#         db.commit()
