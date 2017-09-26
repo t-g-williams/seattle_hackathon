@@ -99,7 +99,7 @@ def createGeoJson(shape_data, attr_data, outname):
     for shape_id, coords in shape_data.items():
         shape_dict = {}
         shp_data = attr_data.ix[str(shape_id)]
-        
+        print(shp_data[])
         # create dictionary of the data
         shp_data_dict = {}
         for type in data_types:
