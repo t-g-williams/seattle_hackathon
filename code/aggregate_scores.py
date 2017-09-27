@@ -8,16 +8,21 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def main(unit):
+# user variables:
+scores = ['score0_49', 'score50_69','score70_89','score90_100']
+demographics = ['pop_total', 'pop_over_65', 'pop_below_10','pop_female','pop_color', 'investment']
+units = ['district','neighborhood']
+# file names
+block_fn = '../data/block_data/sea_blocks_wgs84.shp'
+db_fn = '../query_results/sea_5km.db'
+aggregate_db_fn = '../query_results/sea_boundaries.db'
+
+
+def main(unit, scores, demographics, block_fn, db_fn, aggregate_db_fn):
     '''
     Create db table for neighborhood or council district
     and count of binned access scores
     '''
-
-    # user variables:
-    scores = ['score0_49', 'score50_69','score70_89','score90_100']
-    demographics = ['pop_total', 'pop_over_65', 'pop_below_10','pop_female','pop_color', 'investment']
-    
     var_dtype = [{'area_id': {'dtype': 'VARCHAR(15)', 'val' : ''}},
                 {'score0_49': {'dtype':'INT', 'val' : 0}},
                 {'score50_69': {'dtype':'INT', 'val' : 0}},
@@ -37,10 +42,6 @@ def main(unit):
     var_dtype = {d: i[d]['dtype'] for (d,i) in zip(var_dtype_keys,var_dtype)}
     # get file paths
     unit_id, dstr_fn = GetShpFilePath(unit)
-    block_fn = '../data/block_data/sea_blocks_wgs84.shp'
-    # db_fn = '../query_results/sea_5km_orig.db'
-    db_fn = '../query_results/sea_5km.db'
-    district_db_fn = '../query_results/sea_boundaries.db'
 
     # import the areal boundaries
     blks, dstrs = ImportData(block_fn, dstr_fn, unit_id)
@@ -50,8 +51,7 @@ def main(unit):
     cursor = db.cursor()
 
     # Init connect to new database
-    # if not os.path.isfile(district_db_fn):
-    db_dstr = sqlite3.connect(district_db_fn)
+    db_dstr = sqlite3.connect(aggregate_db_fn)
     cursor_dst = db_dstr.cursor()
 
     # create table
@@ -175,5 +175,5 @@ def CreateTable(var_dtype, var_dtype_keys, unit, db_dstr, cursor_dst):
 
 
 if __name__ == '__main__':
-    for unit in ['district','neighborhood']:
-        main(unit)
+    for unit in units:
+        main(unit, scores, demographics, block_fn, db_fn, aggregate_db_fn)

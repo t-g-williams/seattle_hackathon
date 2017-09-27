@@ -4,20 +4,21 @@ import pandas as pd
 import numpy as np
 import sqlite3
 import logging
+import duplicateDB
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# specify the filename
+shp_fn = '../data/seattle_contracts/seattle-contracts-geocoded.shp'
+block_fn = '../data/block_data/sea_blocks_wgs84.shp'
+db_master_fn = '../query_results/combined-data_5km_master.db'
+db_fn = '../query_results/sea_5km.db'
 
-
-def main():
+def main(shp_fn, block_fn, db_fn, db_master_fn):
     '''
-    Add service table to the database 
+    Duplicate the master database
+    Add service table to the new database 
     '''
-
-    # specify the filename
-    shp_fn = '../data/seattle_contracts/seattle-contracts-geocoded.shp'
-    block_fn = '../data/block_data/sea_blocks_wgs84.shp'
-    db_fn = '../query_results/sea_5km.db'
 
     # specify the attributes to keep
     attributes = {
@@ -33,6 +34,11 @@ def main():
 
     # pair with dest_id
     GeometricIntersect(sf, block_fn)
+
+    # duplicate the master database
+    db2 = sqlite3.connect(db_master_fn)
+    tab_names = getTabNames(db2)
+    duplicateDB.main(db_master_fn, db_fn, tab_names)
     
     # create dataframe
     attributes['fields'].append('dest_id')
@@ -43,7 +49,7 @@ def main():
     df = df[df.dest_id != 'None']
     df = df[fields]
 
-    # add to table
+    # add to new database
     WriteDB(df, db_fn, attributes)
 
 
@@ -110,7 +116,6 @@ def WriteDB(df, db_fn, attributes):
     '''
     Add table to db
     '''
-    
     logger.info('Writing to DB')
     atr = Bunch(attributes) 
 
@@ -136,11 +141,17 @@ def WriteDB(df, db_fn, attributes):
 
     logger.info('Complete')
 
+
 class Bunch(object):
     def __init__(self, adict):
         self.__dict__.update(adict)
 
 
+def getTabNames(db):
+    nms = db.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    names = [nm[0] for nm in nms]
+    return(names)
+
 
 if __name__ == '__main__':
-    main()
+    main(shp_fn, block_fn, db_fn, db_master_fn)

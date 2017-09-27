@@ -6,17 +6,17 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# specify the file names
+dem_fn = '../data/demographic/nhgis0002_ds172_2010_block.csv'
+db_fn =  '../query_results/sea_5km.db'
 
-def main(field):
+fields = [('pop_female','H76026'),('pop_below_10',True),('pop_color',True), ('pop_total','H76001'), ('pop_over_65', True)]
+
+def main(field, dem_fn, db_fn):
 
     ''' 
     Append selected demographic data to the origin database
     '''
-
-    # specify the file names
-    dem_fn = '../data/demographic/nhgis0002_ds172_2010_block.csv'
-    # db_fn =  '../query_results/sea_5km_block.db'
-    db_fn =  '../query_results/sea_5km.db'
 
     # for x in range(0,len(fields)):
 
@@ -136,10 +136,8 @@ def WriteDB(df, db, attr):
 
     logger.info('Complete')
 
-fields = [('pop_female','H76026'),('pop_below_10',True),('pop_color',True), ('pop_total','H76001'), ('pop_over_65', True)]
-
 if __name__ == "__main__":
     for field in fields:
-        main(field)
+        main(field, dem_fn, db_fn)
 
 
