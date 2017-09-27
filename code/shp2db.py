@@ -5,6 +5,7 @@ import numpy as np
 import sqlite3
 import logging
 import duplicateDB
+import generalDBFunctions as db_fns
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,10 @@ def main(shp_fn, block_fn, db_fn, db_master_fn):
     GeometricIntersect(sf, block_fn)
 
     # duplicate the master database
-    db2 = sqlite3.connect(db_master_fn)
-    tab_names = getTabNames(db2)
+    db_master = sqlite3.connect(db_master_fn)
+    tab_names = db_fns.getTabNames(db_master)
     duplicateDB.main(db_master_fn, db_fn, tab_names)
+    db2.close()
     
     # create dataframe
     attributes['fields'].append('dest_id')
@@ -145,12 +147,6 @@ def WriteDB(df, db_fn, attributes):
 class Bunch(object):
     def __init__(self, adict):
         self.__dict__.update(adict)
-
-
-def getTabNames(db):
-    nms = db.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    names = [nm[0] for nm in nms]
-    return(names)
 
 
 if __name__ == '__main__':

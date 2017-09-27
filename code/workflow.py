@@ -21,7 +21,7 @@ import shp2db
 import add_demographics
 import calcHSSAscores
 import subset_database
-import removeTableFromDb
+import duplicateDB
 import aggregate_scores
 import dbToGeoJson
 import logging
@@ -99,7 +99,7 @@ for field in demographic_fields:
 
 # remove tables from db (compress it)
 print('removeTableFromDb...')
-removeTableFromDb.main(db_fn, db_api_subset_name, tables_for_api_subset)
+duplicateDB.main(db_fn, db_api_subset_name, tables_for_api_subset)
 
 # aggregate scores to district and neighborhood
 logger.info('aggregate_scores...')

@@ -3,6 +3,7 @@
 import sqlite3
 import pandas as pd
 import logging
+import generalDBFunctions as db_fns
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -21,8 +22,8 @@ def main(db_in, db_out, tables_to_keep):
 
     for tbl in tables_to_keep:
         logger.info('{}...'.format(tbl))
-        c_names = getColNames(cursor, tbl)
-        orig_pd = sbs.getTable(db, tbl, range(len(c_names)), c_names)
+        c_names = db_fns.getColNames(cursor, tbl)
+        orig_pd = db_fns.getTable(db, tbl, range(len(c_names)), c_names)
         # write to database
         orig_pd.to_sql(tbl, con=db2)
 
@@ -30,14 +31,6 @@ def main(db_in, db_out, tables_to_keep):
     db2.commit()
     db2.close()
     db.close()
-
-
-def getColNames(cursor, table_name):
-    # get the column names of a given table in a database
-    tmp = cursor.execute("SELECT * FROM {}".format(table_name))
-    tmp.fetchone()
-    nmes = [description[0] for description in tmp.description]
-    return(nmes)
 
 if __name__ == '__main__':
     main(db_in, db_out, tables_to_keep)

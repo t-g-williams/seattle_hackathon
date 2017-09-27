@@ -13,6 +13,7 @@ import numpy as np
 import sqlite3
 import code
 import logging
+import generalDBFunctions as db_fns
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -39,13 +40,13 @@ def calcWalkScoresAndInvestment(cursor, db, max_dur, dem_col_name):
     '''
     logger.info('calculating walk scores')
     # get np.DataFrame of orig ids
-    orig_ids = getTable(cursor, 'orig', [0, -1], ['orig_id', 'pop_over_65'])
+    orig_ids = db_fns.getTable(cursor, 'orig', [0, -1], ['orig_id', 'pop_over_65'])
 
     # initialize dictionaries: HSSA scores, contracts for each origin, and contract allocation
     scores_dict = {}
     orig_contracts = {}
     contract_per_cap = {}
-    contract_data = getTable(cursor, 'contracts', [0, 3], ['ContractNo', 'TotalBudgt'])
+    contract_data = db_fns.getTable(cursor, 'contracts', [0, 3], ['ContractNo', 'TotalBudgt'])
     for i in range(contract_data.shape[0]):
         contract_per_cap[contract_data.ix[i,'ContractNo']] = {'amt' : contract_data.ix[i,'TotalBudgt'], 'ppl' : 0}
 
@@ -188,36 +189,10 @@ def getVendorsForOrig(orig_id, cursor):
     services_tuple = tmp.fetchall()
     # convert to pandas data frame
     services_list = [x for x in services_tuple]
-    services_pd = pd.DataFrame(services_list, columns=getColNames(cursor, 'contracts'))
+    services_pd = pd.DataFrame(services_list, columns=db_fns.getColNames(cursor, 'contracts'))
     # add column for duration
     services_pd['walking_time'] = None 
     return(services_pd)   
-
-def getTable(cursor, table_name, col_nums, col_names):
-    '''
-    get table 'table_name' from the database
-    convert to pandas data frame
-    col_nums = a list of column numbers
-    col_names = a list of column names
-    '''
-    tmp = cursor.execute("SELECT * FROM {}".format(table_name))
-    tuple_data = tmp.fetchall()
-    # convert to pandas dataframe
-    data_list = [[row[i] for i in col_nums] for row in tuple_data]
-    contract_pd = pd.DataFrame(data_list, columns=col_names)
-    return(contract_pd)
-
-def getTabNames(db):
-    nms = db.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    names = [nm[0] for nm in nms]
-    return(names)
-
-def getColNames(cursor, table_name):
-    tmp = cursor.execute("SELECT * FROM {}".format(table_name))
-    tmp.fetchone()
-    nmes = [description[0] for description in tmp.description]
-    # print(nmes)
-    return(nmes)
 
 if __name__ == '__main__':
     main(dem_fn, db_fn, dem_col_name)

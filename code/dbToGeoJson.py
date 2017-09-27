@@ -8,11 +8,12 @@ import json
 import pickle
 import code
 import logging
+import generalDBFunctions as db_fns
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 outdir = '../data/frontend_plotting/'
-levels = ['district', 'neighborhood', block]
+levels = ['district', 'neighborhood', 'block']
 for_api = 'True'
 
 def main(level, for_api, outdir):
@@ -45,8 +46,8 @@ def main(level, for_api, outdir):
     # import database table (data)
     db = sqlite3.connect(db_fn)
     cursor = db.cursor()
-    c_names = getColNames(cursor, level)
-    walk_data = getTable(cursor, level, list(range(len(c_names))), c_names)
+    c_names = db_fns.getColNames(cursor, level)
+    walk_data = db_fns.getTable(cursor, level, list(range(len(c_names))), c_names)
     # set index
     walk_data.set_index(db_id_col_name, inplace=True)
 
@@ -95,7 +96,7 @@ def createForApi(shape_data, attr_data, outname):
     for shape_id, coords in shape_data.items():
         shape_dict = {}
         shp_data = attr_data.ix[str(shape_id)]
-        print(shp_data[])
+
         # create dictionary of the data
         shp_data_dict = {}
         for type in data_types:
@@ -152,27 +153,6 @@ def createGeoJson(shape_data, attr_data, outname):
     # write the json file
     with open(outname, 'w') as file:
         file.write(json.dumps(gj_dict))
-
-
-def getTable(cursor, table_name, col_nums, col_names):
-    ''' 
-    get table 'table_name' from the database and convert to pandas data frame
-    col_nums = a list of column numbers
-    col_names = a list of column names
-    '''
-    tmp = cursor.execute("SELECT * FROM {}".format(table_name))
-    tuple_data = tmp.fetchall()
-    # convert to pandas dataframe
-    data_list = [[row[i] for i in col_nums] for row in tuple_data]
-    data_pd = pd.DataFrame(data_list, columns=col_names)
-    return(data_pd)
-
-def getColNames(cursor, table_name):
-    # get the column names of a given table in a database
-    tmp = cursor.execute("SELECT * FROM {}".format(table_name))
-    tmp.fetchone()
-    nmes = [description[0] for description in tmp.description]
-    return(nmes)
 
 if __name__ == '__main__':
     for level in levels:
