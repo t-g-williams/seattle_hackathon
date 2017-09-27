@@ -12,6 +12,11 @@ db_in = '../query_results/sea_5km.db'
 db_out = '../query_results/sea_API.db'
 tables_to_keep = ['orig', 'contracts', 'destsubset']
 
+# connect to databases
+db_in = '../query_results/combined-data_5km_master.db'
+db_out = '../query_results/im_a_boss.db'
+tables_to_keep = ['origxdest']
+
 def main(db_in, db_out, tables_to_keep):
 
     db = sqlite3.connect(db_in)
@@ -31,24 +36,15 @@ def main(db_in, db_out, tables_to_keep):
         cursor2.execute(add_table_str)
 
         # add data to table
-        tbl_data = db.execute("SELECT * FROM {}".format())
-        print('fetched table')
-        i = 0
+        tbl_data = cursor.execute("SELECT * FROM {}".format(tbl))
+        logger.info('Fetched table {}'.format(tbl))
         for row in tbl_data.fetchall():
-            i += 1
-            print(i)
+            print(row)
             data_str = "INSERT INTO {} VALUES ({})".format(tbl, val_str)
-            cols = tuple([k for k in row.keys() if k != 'id'])
-            row_data = [row[c] for c in cols]
-            cursor2.execute(data_str, row_data)
-
-
-
-
-
-        orig_pd = db_fns.getTable(db, tbl, range(len(c_names)), c_names)
-        # write to database
-        orig_pd.to_sql(tbl, con=db2)
+            # cols = tuple([k for k in row.keys() if k != 'id'])
+            # row_data = [row[c] for c in cols]
+            cursor2.execute(data_str, row)
+        logger.info('Added table {} to new database'.format(tbl))
 
     logger.info('new database created')
     db2.commit()
