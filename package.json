@@ -1,14 +1,25 @@
 {
-    "name": "app-service-hello-world",
-    "description": "Simple Hello World Node.js sample for Azure App Service",
+    "name": "seattle-senior-service-access",
+    "description": "Identifying disparities in service provision",
+    "main": "server.js",
+    "scripts": {
+           "start": "node server.js",
+           "test": "echo \"Error: no test specified\" && exit 1"
+       },
     "version": "0.0.1",
     "private": true,
     "license": "MIT",
-    "author": "Microsoft",
-    "engines": {
-        "node": ">=6.9.1"
-    },
-    "scripts": {
-        "start": "node server.js"
-    }
+    "keywords": [
+          "node",
+          "angular"
+      ],
+      "dependencies" : {
+          "express"    : "~4.7.2",
+          "mongoose"   : "~3.6.2",
+          "morgan"     : "~1.2.2",
+          "body-parser": "~1.5.2",
+          "method-override": "~2.1.2"
+      },
+      "author": "tomlogan@umich.edu",
+      "license": "MIT"
 }
