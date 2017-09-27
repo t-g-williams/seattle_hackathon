@@ -14,8 +14,8 @@ tables_to_keep = ['orig', 'contracts', 'destsubset']
 
 # connect to databases
 db_in = '../query_results/combined-data_5km_master.db'
-db_out = '../query_results/im_a_boss.db'
-tables_to_keep = ['origxdest']
+db_out = '../query_results/im_a_boss_really.db'
+tables_to_keep = ['orig']#,'origxdest']
 
 def main(db_in, db_out, tables_to_keep):
 
@@ -38,12 +38,21 @@ def main(db_in, db_out, tables_to_keep):
         # add data to table
         tbl_data = cursor.execute("SELECT * FROM {}".format(tbl))
         logger.info('Fetched table {}'.format(tbl))
-        for row in tbl_data.fetchall():
-            print(row)
-            data_str = "INSERT INTO {} VALUES ({})".format(tbl, val_str)
+        # for row in tbl_data.fetchall():
+        #     data_str = "INSERT INTO {} VALUES ({})".format(tbl, val_str)
+        #     # cols = tuple([k for k in row.keys() if k != 'id'])
+        #     # row_data = [row[c] for c in cols]
+        #     cursor2.execute(data_str, row)
+
+        row = tbl_data.fetchone()
+        data_str = "INSERT INTO {} VALUES ({})".format(tbl, val_str)
+        while row not None:
             # cols = tuple([k for k in row.keys() if k != 'id'])
             # row_data = [row[c] for c in cols]
+            print(row)
             cursor2.execute(data_str, row)
+            tbl_data.fetchone()
+
         logger.info('Added table {} to new database'.format(tbl))
 
     logger.info('new database created')
