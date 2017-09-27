@@ -8,20 +8,21 @@ import json
 import pickle
 import code
 import logging
+import os
 import generalDBFunctions as db_fns
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 outdir = '../data/frontend_plotting/'
 levels = ['district', 'neighborhood', 'block']
-for_api = 'True'
 
-def main(level, for_api, outdir):
+def main(level, outdir):
     '''
     Create a geojson or geojson-esque file containing shape, demographic and HSSA information
     '''
+    logger.info('creating json for {}'.format(level))
     sf_readname = '../data/boundaries/' + level + '_data'
-    outname = outdir + level + '_data.json'
+    table_name = level
 
     if level == 'district':
         db_fn =  '../query_results/sea_boundaries.db'
@@ -37,6 +38,7 @@ def main(level, for_api, outdir):
         db_fn =  '../query_results/sea_5km.db'
         id_col_num = 7
         db_id_col_name = 'orig_id'
+        table_name = 'orig'
 
     # below here, nothing should need to be changed
 
@@ -46,17 +48,21 @@ def main(level, for_api, outdir):
     # import database table (data)
     db = sqlite3.connect(db_fn)
     cursor = db.cursor()
-    c_names = db_fns.getColNames(cursor, level)
-    walk_data = db_fns.getTable(cursor, level, list(range(len(c_names))), c_names)
+    c_names = db_fns.getColNames(cursor, table_name)
+    walk_data = db_fns.getTable(cursor, table_name, list(range(len(c_names))), c_names)
     # set index
     walk_data.set_index(db_id_col_name, inplace=True)
 
     # link these together, and export gj file
-    if for_api:
-        # create a geojson-esque file
-        createForApi(shape_data, walk_data, outname)
-    else:
-        createGeoJson(shape_data, walk_data, outname)
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+
+    # create a geojson-esque file
+    outname = outdir + level + '_data_for_api.json'
+    createForApi(shape_data, walk_data, outname)
+    # create geojson file
+    outname = outdir + level + '_data.gj'
+    createGeoJson(shape_data, walk_data, outname)
 
 def getShapeData(sf_readname, id_col_num):
     '''
@@ -94,6 +100,9 @@ def createForApi(shape_data, attr_data, outname):
 
     # add elements to the geometries - loop through the shapes
     for shape_id, coords in shape_data.items():
+        if shape_id == 'all':
+            continue
+
         shape_dict = {}
         shp_data = attr_data.ix[str(shape_id)]
 
@@ -130,13 +139,15 @@ def createGeoJson(shape_data, attr_data, outname):
     gj_dict['features'] = [{'geometry' : {'type' : 'GeometryCollection', 'geometries' : []}}]
     data_types = list(attr_data.columns.values)
 
-    for block_id, coords in shape_data.items():
+    for shape_id, coords in shape_data.items():
+        if shape_id == 'all':
+            continue
         # find matching row in attr_data
-        block_data = attr_data.ix[block_id]
+        shape_data = attr_data.ix[shape_id]
         
-        block_data_dict = {}
+        shape_data_dict = {}
         for type in data_types:
-            block_data_dict[type] = block_data.ix[type]
+            shape_data_dict[type] = shape_data.ix[type]
         
         # convert coordinates to list of lists
         coords_list = []
@@ -146,7 +157,7 @@ def createGeoJson(shape_data, attr_data, outname):
         # add to the dictionary
         shape_dict = {'type' : 'Polygon', 'coordinates' : coords_list}
         # add in the block data, 'HSSAscore' : hssa_score}
-        shape_dict.update(block_data_dict)
+        shape_dict.update(shape_data_dict)
         # append to master dictionary
         gj_dict['features'][0]['geometry']['geometries'].append(shape_dict)
 
@@ -156,4 +167,4 @@ def createGeoJson(shape_data, attr_data, outname):
 
 if __name__ == '__main__':
     for level in levels:
-        main(level, for_api, outdir)
+        main(level, outdir)

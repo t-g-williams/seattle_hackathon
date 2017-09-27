@@ -45,7 +45,7 @@ def ImportDemographics(dem_fn, attr, cursor):
     dem_colname (list of str) = column name(s) of the demographic data to be added to the database
     db_fn (str) = full path and filename of the origins database
     '''
-    logger.info('Importing demographics: ' + attr['field'])
+    logger.info('Importing demographics: ' + str(attr['field']))
 
     # import demographic data (csv)
     df = pd.read_csv(dem_fn, header = 0,  

@@ -43,37 +43,9 @@ db_api_subset_name = '../query_results/sea_API.db'
 tables_for_api_subset = ['orig', 'contracts', 'destsubset']
 aggregate_levels = ['district', 'neighborhood']
 values_for_aggregate = ['pop_total', 'pop_over_65', 'pop_below_10', 'pop_female', 'pop_color', 'investment']
+scores = ['score0_49', 'score50_69','score70_89','score90_100']
 aggregate_db_fn = '../query_results/sea_boundaries.db'
-json_for_api = True # false for a geojson
 json_outdir = '../data/frontend_plotting/'
-
-
-
-
-
-# input data (required)
-shp_fn = '../data/seattle_contracts/seattle-contracts-geocoded.shp'
-block_fn = '../data/block_data/sea_blocks_wgs84.shp'
-db_master_fn = '../query_results/combined-data_5km_master.db' # master database - not to be changed
-dem_fn = '../data/demographic/nhgis0002_ds172_2010_block.csv'
-
-# other intermediate inputs and outputs
-db_fn = '../query_results/sea_5km_tim_testing.db' # this is the output database (used by most scripts)
-max_dur = 30*60 # 30 minutes
-dem_field_for_hssa = ('pop_over_65', True)
-demographic_fields = [('pop_female','H76026'),('pop_below_10',True),('pop_color',True), ('pop_total','H76001') ]
-db_api_subset_name = '../query_results/sea_API.db'
-tables_for_api_subset = ['orig', 'contracts', 'destsubset']
-aggregate_levels = ['district', 'neighborhood']
-values_for_aggregate = ['pop_total', 'pop_over_65', 'pop_below_10', 'pop_female', 'pop_color', 'investment']
-aggregate_db_fn = '../query_results/sea_boundaries.db'
-json_for_api = True # false for a geojson
-json_outdir = '../data/frontend_plotting/'
-
-
-
-
-
 
 
 
@@ -87,7 +59,7 @@ subset_database.main(db_fn, max_dur)
 
 # add the pop>65 count for each block
 logger.info('add_demographics...')
-add_demographics.main((dem_field_for_hssa, True), dem_fn, db_fn)
+add_demographics.main(dem_field_for_hssa, dem_fn, db_fn)
 
 # calculate the HSSA scores and funding allocation
 logger.info('calcHSSAscores...')
@@ -109,7 +81,7 @@ for unit in aggregate_levels:
 # convert to json-esque format
 logger.info('dbToGeoJson...')
 # NOTE: This is not generalizable if adding new geographies
-all_levels = aggregate_levels.append('block')
+all_levels = aggregate_levels + ['block']
 for level in all_levels:
-    dbToGeoJson.main(level, json_for_api, json_outdir)
+    dbToGeoJson.main(level, json_outdir)
 

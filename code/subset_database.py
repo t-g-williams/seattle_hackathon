@@ -53,7 +53,7 @@ def createSubsetDataframe(cursor, max_dur):
     cols_str = "orig_id VARCHAR (15), dest_id VARCHAR (15), walking_time INT"
     
     # add to data base
-    db_fns.addPdToDb(od_pairs, cursor, 'destsubset', cols_str, col_names)
+    addPdToDb(od_pairs, cursor, 'destsubset', cols_str, col_names)
     return
 
 

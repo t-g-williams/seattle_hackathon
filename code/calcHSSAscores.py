@@ -89,8 +89,7 @@ def calcWalkScoresAndInvestment(cursor, db, max_dur, dem_col_name):
     scores_pd['HSSAscore'] = 100 * scores_pd['HSSAscore'].divide(max(scores_pd['HSSAscore']))
     logger.info('...normalized the scores')
     
-    # add scores to database
-    code.interact(local=locals()) 
+    # add scores to database 
     WriteDB(scores_pd, db, 'investment')
     WriteDB(scores_pd, db, 'HSSAscore')
     db.commit()

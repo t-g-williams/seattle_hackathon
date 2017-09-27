@@ -5,6 +5,7 @@ import numpy as np
 import sqlite3
 import logging
 import duplicateDB
+from shutil import copyfile
 import generalDBFunctions as db_fns
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,10 +38,11 @@ def main(shp_fn, block_fn, db_fn, db_master_fn):
     GeometricIntersect(sf, block_fn)
 
     # duplicate the master database
-    db_master = sqlite3.connect(db_master_fn)
-    tab_names = db_fns.getTabNames(db_master)
-    duplicateDB.main(db_master_fn, db_fn, tab_names)
-    db2.close()
+    # db_master = sqlite3.connect(db_master_fn)
+    # tab_names = db_fns.getTabNames(db_master)
+    # duplicateDB.main(db_master_fn, db_fn, tab_names)
+    # db2.close()
+    copyfile(db_master_fn, db_fn)
     
     # create dataframe
     attributes['fields'].append('dest_id')
