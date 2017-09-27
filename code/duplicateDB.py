@@ -23,6 +23,29 @@ def main(db_in, db_out, tables_to_keep):
     for tbl in tables_to_keep:
         logger.info('{}...'.format(tbl))
         c_names = db_fns.getColNames(cursor, tbl)
+        c_names_str = ', '.join(c_names)
+        val_str = ', '.join(len(c_names) * '?')
+
+        # add table and columns to new database
+        add_table_str = "CREATE TABLE {}({})".format(tbl, c_names_str)
+        cursor2.execute(add_table_str)
+
+        # add data to table
+        tbl_data = db.execute("SELECT * FROM {}".format())
+        print('fetched table')
+        i = 0
+        for row in tbl_data.fetchall():
+            i += 1
+            print(i)
+            data_str = "INSERT INTO {} VALUES ({})".format(tbl, val_str)
+            cols = tuple([k for k in row.keys() if k != 'id'])
+            row_data = [row[c] for c in cols]
+            cursor2.execute(data_str, row_data)
+
+
+
+
+
         orig_pd = db_fns.getTable(db, tbl, range(len(c_names)), c_names)
         # write to database
         orig_pd.to_sql(tbl, con=db2)
