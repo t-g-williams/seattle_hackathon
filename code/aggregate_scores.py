@@ -95,7 +95,7 @@ def main(unit, scores, demographics, block_fn, db_fn, aggregate_db_fn):
             pop = result[2]
             
             var_dict_i['pop_over_65']  += pop
-            score = int(score*100)
+            score = int(score)
             # mean
             pop_total += pop
             score_weight += score*pop

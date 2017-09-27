@@ -86,7 +86,7 @@ def calcWalkScoresAndInvestment(cursor, db, max_dur, dem_col_name):
     HSSAs = [val['HSSA'] for val in scores_dict.values()]
     investments = [val['investment'] for val in scores_dict.values()]
     scores_pd = pd.DataFrame({'orig_id' : list(scores_dict.keys()), 'HSSAscore' : HSSAs, 'investment' : investments})
-    scores_pd['HSSAscore'] = 100 * scores_pd['HSSAscore'].divide(max(scores_pd['HSSAscore']))
+    scores_pd['HSSAscore'] = int(100 * scores_pd['HSSAscore'].divide(max(scores_pd['HSSAscore'])))
     logger.info('...normalized the scores')
     
     # add scores to database 
