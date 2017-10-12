@@ -59,12 +59,11 @@ def main(unit, scores, demographics, block_fn, db_fn, aggregate_db_fn):
     # score bin upper limits
     bin_lim = np.array([5,10,15,100])
     
-
-    # loop through
     logger.info('looping {}'.format(unit))
+    # loop through the districts or neighborhoods
     for i in range(len(dstrs) + 1):
         # re-init the variables
-        var_dict_i = var_val
+        var_dict_i = var_val.copy()
         if i < len(dstrs):
             # add name to dict
             var_dict_i['area_id'] = str(dstrs[unit_id][i])
@@ -78,23 +77,21 @@ def main(unit, scores, demographics, block_fn, db_fn, aggregate_db_fn):
             var_dict_i['area_id'] = 'all'
             # which blocks are within poly
             block_ids = blks['BLOCKID10'].tolist()
+
         # query SQL to return the score and pop_over_65
         query_str = 'SELECT HSSAscore, ' + ','.join(demographics) + ' FROM {} WHERE orig_id = (?)'.format('orig')
         results = []
         for j in range(len(block_ids)):
             results.append(cursor.execute(query_str,(block_ids[j],)).fetchone())
-
-
+        #
         # convert result to dictionary
         pop_total = 0
         score_weight = 0
         bins = [0,0,0,0]
         for result in results:
             score = result[0]
-            var_dict_i['pop_total'] += result[1]
             pop = result[2]
-            
-            var_dict_i['pop_over_65']  += pop
+            #
             score = int(score)
             # mean
             pop_total += pop
