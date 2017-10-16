@@ -51,7 +51,6 @@ aggregate_db_fn = '../query_results/new_hssa/sea_boundaries.db'
 json_outdir = '../data/frontend_plotting/'
 
 
-
 # create table for contracts
 logger.info('shp2db...')
 shp2db.main(shp_fn, block_fn, db_fn, db_master_fn)
@@ -91,37 +90,3 @@ for level in all_levels:
     dbToGeoJson.main(level, json_outdir, aggregate_db_fn)
 
 
-
-
-import shp2db
-import add_demographics
-import calcHSSAscores
-import subset_database
-import duplicateDB
-import aggregate_scores
-import dbToGeoJson
-import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-#### file names and parameters ####
-# input data (required)
-shp_fn = '../data/seattle_contracts/seattle-contracts-geocoded.shp'
-block_fn = '../data/block_data/sea_blocks_wgs84.shp'
-db_master_fn = '../query_results/new_hssa/combined-data_5km_master.db' # this is the input database name
-dem_fn = '../data/demographic/nhgis0002_ds172_2010_block.csv'
-
-# other intermediate inputs and outputs
-db_fn = '../query_results/new_hssa/sea_5km.db' # this database will be generated
-max_dur = 30*60 # 30 minutes
-dem_field_for_hssa = ('pop_over_65', True)
-demographic_fields = [('pop_female','H76026'),('pop_below_10',True),('pop_color',True), ('pop_total','H76001') ]
-db_api_subset_name = '../query_results/new_hssa/sea_API.db'
-tables_for_api_subset = ['orig', 'contracts', 'destsubset']
-aggregate_levels = ['district', 'neighborhood']
-values_for_aggregate = ['pop_total', 'pop_over_65', 'pop_below_10', 'pop_female', 'pop_color', 'investment']
-scores = ['score0_49', 'score50_69','score70_89','score90_100']
-aggregate_db_fn = '../query_results/new_hssa/sea_boundaries.db'
-json_outdir = '../data/frontend_plotting/'
-
-aggregate_scores.main(aggregate_levels[0], scores, values_for_aggregate, block_fn, db_fn, aggregate_db_fn)

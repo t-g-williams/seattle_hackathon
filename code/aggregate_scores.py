@@ -64,6 +64,7 @@ def main(unit, scores, demographics, block_fn, db_fn, aggregate_db_fn):
     for i in range(len(dstrs) + 1):
         # re-init the variables
         var_dict_i = var_val.copy()
+
         if i < len(dstrs):
             # add name to dict
             var_dict_i['area_id'] = str(dstrs[unit_id][i])

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 outdir = '../data/frontend_plotting/'
 levels = ['district', 'neighborhood', 'block']
 
-def main(level, outdir):
+def main(level, outdir, db_fn):
     '''
     Create a geojson or geojson-esque file containing shape, demographic and HSSA information
     '''
@@ -25,12 +25,10 @@ def main(level, outdir):
     table_name = level
 
     if level == 'district':
-        db_fn =  '../query_results/sea_boundaries.db'
         id_col_num = 2
         db_id_col_name = 'area_id'
 
-    if level == 'neighborhood':
-        db_fn =  '../query_results/sea_boundaries.db'
+    if level == 'neighborhood':       
         id_col_num = 4
         db_id_col_name = 'area_id'
 
@@ -58,7 +56,7 @@ def main(level, outdir):
         os.makedirs(outdir)
 
     # create a geojson-esque file
-    outname = outdir + level + '_data_for_api.json'
+    outname = outdir + level + '_data.json'
     createForApi(shape_data, walk_data, outname)
     # create geojson file
     outname = outdir + level + '_data.gj'
@@ -100,28 +98,28 @@ def createForApi(shape_data, attr_data, outname):
 
     # add elements to the geometries - loop through the shapes
     for shape_id, coords in shape_data.items():
-        if shape_id == 'all':
-            continue
-
+        # if shape_id == 'all':
+            # continue
+        #
         shape_dict = {}
         shp_data = attr_data.ix[str(shape_id)]
-
+        #
         # create dictionary of the data
         shp_data_dict = {}
         for type in data_types:
             shp_data_dict[type] = shp_data.ix[type]
         shp_data_dict.update({'id' : shape_id})
-        
+        #
         # convert coordinates to list of lists
         coords_list = []
         for elem in coords:
             coords_list.append([elem[1] ,elem[0]])
-
+        #
         # add coordinates to dictionary
         shape_dict['coordinates'] = coords_list
         # add the block data to the dictionary
         shape_dict.update(shp_data_dict)
-
+        #
         # append to master list
         gj_list.append(shape_dict)
 
